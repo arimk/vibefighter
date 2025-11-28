@@ -110,9 +110,9 @@ async function fetchAndUploadImage(url: string): Promise<{ uploadedFile: Uploade
 
 // Helper: Generate Prompt (Step 1 - Updated)
 async function generateSpecialPrompt(uploadedConceptFile: UploadedFile): Promise<string> {
-    console.log("Generating special power prompt using model gemini-2.5-flash-preview-04-17...");
+    console.log("Generating special power prompt using model gemini-2.5-flash...");
     // Use exact model and config from user example 1
-    const model = 'gemini-2.5-flash-preview-04-17';
+    const model = 'gemini-2.5-flash';
     const config = {
         responseMimeType: 'text/plain',
         // Ensure thinkingConfig matches user example if needed
@@ -162,12 +162,13 @@ ONLY answer with the prompt, nothing before or after`,
 
 // Helper: Generate Image (Step 2 - Updated)
 async function generateSpecialImage(prompt: string): Promise<{ buffer: Buffer; mimeType: string }> {
-    console.log("Generating special power image using model gemini-2.0-flash-exp-image-generation...");
+    console.log("Generating special power image using model gemini-2.5 flash image...");
     // Use exact model and config from user example 2
-    const model = 'gemini-2.0-flash-exp-image-generation';
+    const model = 'gemini-2.5-flash-image';
     const config = {
-        responseModalities: ['image', 'text'],
+        responseModalities: ['image'],
         responseMimeType: 'text/plain', // Expecting inlineData within text/plain response
+        imageConfig: {"aspectRatio": "1:1"}
     };
     const contents = [{
         role: 'user',
@@ -207,9 +208,9 @@ async function generateSpecialImage(prompt: string): Promise<{ buffer: Buffer; m
 
 // Helper: Check Direction (Step 3 - Updated)
 async function checkImageDirection(uploadedImageFile: UploadedFile): Promise<string> {
-    console.log("Checking image direction using model gemini-2.5-flash-preview-04-17...");
+    console.log("Checking image direction using model gemini-2.5-flash");
     // Use exact model and config from user example 3
-    const model = 'gemini-2.5-flash-preview-04-17';
+    const model = 'gemini-2.5-flash';
     const config = {
         responseMimeType: 'text/plain',
         // thinkingConfig: { thinkingBudget: 0 } // Add if required by example/docs
@@ -257,11 +258,11 @@ Only answer "YES" or "NO" if it's going from right to left, or "NA" of it's not 
 
 // Helper: Reverse Image (Step 3A - Updated)
 async function reverseImage(uploadedOriginalImageFile: UploadedFile): Promise<{ buffer: Buffer; mimeType: string }> {
-    console.log("Reversing image using model gemini-2.0-flash-exp-image-generation...");
+    console.log("Reversing image using model gemini-2.5-flash image generation...");
      // Use exact model and config from user example 3A
-    const model = 'gemini-2.0-flash-exp-image-generation';
+    const model = 'gemini-2.5-flash-image';
     const config = {
-        responseModalities: ['image', 'text'],
+        responseModalities: ['text'],
         responseMimeType: 'text/plain', // Expecting inlineData within text/plain response
     };
     const contents = [{
@@ -307,71 +308,76 @@ async function reverseImage(uploadedOriginalImageFile: UploadedFile): Promise<{ 
     return { buffer: reversedImageBuffer, mimeType: reversedImageMimeType };
 }
 
-// Helper: Remove Background (Step 4 - Uses async polling)
+// Define the expected output structure (FileOutput has a url() method)
+interface ReplicateFileOutput {
+    url: () => { href: string } | string; // Returns object with href or string directly
+}
+
+// Helper: Remove Background (Step 4 - Uses Bria model via replicate.run)
 async function removeImageBackground(imageBuffer: Buffer, mimeType: string): Promise<string> {
+    // Convert buffer to base64 data URI for Replicate
     const base64Data = imageBuffer.toString('base64');
     const dataUri = `data:${mimeType};base64,${base64Data}`;
     const input = { image: dataUri };
 
-    console.log(`Creating Replicate prediction for background removal...`);
+    console.log(`Running Bria background removal via Replicate...`);
 
     try {
-        // 1. Create the prediction
-        let prediction = await replicate.predictions.create({
-            version: "c57bc7626c4b5eda6531ffb84657f5672932d0fad49120b94383ec93f7ad7ac6",
-            input: input,
-        });
+        // Use replicate.run() with Bria model
+        const output: unknown = await replicate.run("bria/remove-background", { input });
 
-        console.log(`Replicate prediction created: ${prediction.id}, Status: ${prediction.status}`);
+        // Debug: Log the output structure
+        console.log('Replicate output type:', typeof output);
+        console.log('Replicate output is array:', Array.isArray(output));
 
-        const pollInterval = 2000; // Poll every 2 seconds
-        const maxAttempts = 90; // Max attempts (e.g., 3 minutes)
-        let attempts = 0;
+        let imageUrl: string | null = null;
 
-        // 2. Poll for completion
-        while (prediction.status !== "succeeded" && prediction.status !== "failed" && prediction.status !== "canceled" && attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
-            prediction = await replicate.predictions.get(prediction.id);
-            attempts++;
-            console.log(`Polling Replicate prediction ${prediction.id}: Status=${prediction.status}, Attempt=${attempts}`);
+        // Handle array output (like other Replicate models)
+        if (Array.isArray(output) && output.length > 0) {
+            const firstItem = output[0];
+            if (typeof firstItem === 'object' && firstItem !== null && typeof (firstItem as ReplicateFileOutput).url === 'function') {
+                try {
+                    const urlResult = (firstItem as ReplicateFileOutput).url();
+                    // Check if url() returns an object with href property
+                    if (typeof urlResult === 'object' && urlResult !== null && typeof (urlResult as any).href === 'string') {
+                        imageUrl = (urlResult as any).href;
+                    } else if (typeof urlResult === 'string') {
+                        imageUrl = urlResult;
+                    }
+                } catch (e) {
+                    console.error("Error calling Replicate .url():", e);
+                }
+            }
+        }
+        // Handle single object output
+        else if (typeof output === 'object' && output !== null && typeof (output as ReplicateFileOutput).url === 'function') {
+            try {
+                const urlResult = (output as ReplicateFileOutput).url();
+                // Check if url() returns an object with href property
+                if (typeof urlResult === 'object' && urlResult !== null && typeof (urlResult as any).href === 'string') {
+                    imageUrl = (urlResult as any).href;
+                } else if (typeof urlResult === 'string') {
+                    imageUrl = urlResult;
+                }
+            } catch (e) {
+                console.error("Error calling Replicate .url():", e);
+            }
+        }
+        // Handle direct string output
+        else if (typeof output === 'string') {
+            imageUrl = output;
         }
 
-        // 3. Handle final status
-        if (prediction.status === "succeeded") {
-            console.log(`Replicate prediction ${prediction.id} succeeded.`);
-            // --- Extract URL from the final prediction object --- 
-            const output = prediction.output;
-            console.log('Final Replicate Output:', output);
-            
-             if (typeof output === 'object' && output !== null && 'output' in output && typeof (output as any).output === 'string') {
-                const imageUrl = (output as any).output; // This check might be redundant if prediction.output structure is consistent
-                console.log('Background removed image URL (from prediction.output field):', imageUrl);
-                return imageUrl;
-            } else if (typeof output === 'string') { // Direct string output check
-                 console.log('Background removed image URL (direct string prediction.output):', output);
-                 return output;
-             } else if (Array.isArray(output) && typeof output[0] === 'string') { // Array of strings check
-                 console.log('Background removed image URL (from prediction.output array):', output[0]);
-                 return output[0];
-             } else {
-                console.error("Unexpected final Replicate output format in prediction object:", output);
-                throw new Error("Could not get URL from final Replicate prediction output.");
-             }
-        } else if (prediction.status === "failed") {
-            console.error(`Replicate prediction ${prediction.id} failed:`, prediction.error);
-            throw new Error(`Background removal failed: ${prediction.error || 'Unknown Replicate error'}`);
-        } else if (prediction.status === "canceled") {
-             console.error(`Replicate prediction ${prediction.id} canceled.`);
-            throw new Error("Background removal was canceled.");
-        } else { // Hit max attempts
-            console.error(`Replicate prediction ${prediction.id} timed out after ${attempts} attempts.`);
-            throw new Error("Background removal timed out.");
+        if (!imageUrl || typeof imageUrl !== 'string') {
+            console.error("Invalid image URL from Replicate. Output structure:", output);
+            throw new Error("Could not get valid URL from Replicate output.");
         }
+
+        console.log('Background removed image URL:', imageUrl);
+        return imageUrl;
 
     } catch (error: any) {
-        // Catch errors during create/get calls or from thrown errors above
         console.error("Error during Replicate background removal process:", error);
-        // Ensure error is propagated
         throw new Error(`Background removal failed: ${error.message || 'Unknown error during process'}`);
     }
 }

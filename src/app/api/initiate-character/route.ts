@@ -72,6 +72,7 @@ async function uploadToTripo(imageData: Buffer, contentType: string): Promise<st
 async function createTripoTask(imageToken: string): Promise<string> {
     const url = 'https://api.tripo3d.ai/v2/openapi/task';
     const payload = {
+        //model_version: "Turbo-v1.0-20250506",
         type: 'image_to_model',
         file: {
             type: 'jpg', // Assuming jpg based on Replicate output format

@@ -185,10 +185,11 @@ export async function POST(req: NextRequest) {
                     console.log("Calling Gemini stream for floor texture...");
                     // Use the config from the user's example
                     const config = {
-                        responseModalities: ['image', 'text'],
-                        responseMimeType: 'text/plain', // As per user example
+                        responseModalities: ['image'],
+                        responseMimeType: 'text/plain', 
+                        imageConfig: {"aspectRatio": "1:1"}
                     };
-                    const model = 'gemini-2.0-flash-exp-image-generation';
+                    const model = 'gemini-2.5-flash-image';
                     const contents = [{
                         role: 'user',
                         parts: [
@@ -232,7 +233,7 @@ export async function POST(req: NextRequest) {
                 let concatenatedName = "";
                 try {
                     console.log("Calling Gemini stream for location name...");
-                    const model = 'gemini-2.0-flash';
+                    const model = 'gemini-2.5-flash';
                     const contents = [{
                         role: 'user',
                         parts: [

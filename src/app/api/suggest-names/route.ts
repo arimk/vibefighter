@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 
         console.log(`Sending image (${contentType}) to Gemini...`);
         const result = await genAI.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             // Combine all instructions and data under the 'user' role
             contents: [
                 { role: "user", parts: userPromptParts }
