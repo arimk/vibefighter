@@ -36,7 +36,7 @@ Fight commands :
 The is using multiple AIs:
 - Replicate for character and background generation, using your the FLUX LoRa of choice
 - Tripo3D for 3D models generation of the character and rigging --> top up and free credits on [Tripo3D API](https://platform.tripo3d.ai/)
-- Gemini for text generation and some images creation (special powers/floor design based on background)
+- Gemini 2.5 flash for text generation and some images creation (Nano Banana for special powers/floor design based on background)
 - Fish Audio for name audio generation
 
 Database is based on Supabase and file storage with CloudFlare R2
@@ -75,11 +75,6 @@ Examples using other LoRas :
 ![pop 1](/readme/pop1.jpg)
 
 ![pop 2](/readme/pop2.jpg)
-
-
-### Gemini 2.0 flash image for non US users
-
-If Gemini 2.0 flash image model is not available in your country, you will need to run it through a VPN
 
 
 ### Run
