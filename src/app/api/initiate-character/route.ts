@@ -40,8 +40,8 @@ const supabaseAdmin = createClient(
 async function uploadToTripo(imageData: Buffer, contentType: string): Promise<string> {
     const url = "https://api.tripo3d.ai/v2/openapi/upload";
     const formData = new FormData();
-    // Create a Blob from the Buffer
-    const imageBlob = new Blob([imageData], { type: contentType });
+		// Create a Blob from a Uint8Array copy of the Buffer to satisfy TS BlobPart types
+		const imageBlob = new Blob([new Uint8Array(imageData)], { type: contentType });
     formData.append('file', imageBlob, 'character_concept.jpg'); // Filename is arbitrary here
 
     const response = await fetch(url, {
